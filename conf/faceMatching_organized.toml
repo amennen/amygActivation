@@ -1,0 +1,88 @@
+# this version: organized into what is saved on cloud vs. saved on local
+
+title = "faceMatching"
+plotTitle = 'Amygdala Activity'
+plotXLabel = 'TR #'
+plotYLabel = '% Increase'
+plotXRangeLow = 0
+plotXRangeHigh = 196
+plotYRangeLow = 0
+plotYRangeHigh = 1
+
+rtData = true
+date = "2/19/19" # "2018-08-16"  # or "today", "now", "2018-03-01" or "03/01/2018" etc.
+subjectName = "0219191_faceMatching" # PATIENT ID NAME THAT YOU ENTER INTO THE SCANNER
+subjectNum = 101
+subjectDay = 2
+mode = "debug"  #"debug" 
+machine = "cluster" #"cluster"
+
+# MODE OPTIONS
+# 1 - LOCAL -- PROCESSING ON LINUX
+# 2 - CLOUD -- PROCESSING FROM LINUX TO CLOUD
+# 3 - DEBUG -- PROCESSING ON CLUSTER TO CLUSTER
+
+# MACHINE OPTIONS FOR PREPARING FOLDERS
+# 1 - INTEL -- RUNNING CODE ON INTEL LINUX CURRENTLY
+# 2 - CLOUD -- RUNNING CODE ON CLOUD CURRENTLY
+# 3 - CLUSTER -- RUNNING ON CLUSTER
+
+# RUN PARAMETERS
+nTR_skip = 2 # number of TRs to skip at the beginning of the run
+nTR_run = 196
+nVox = 275 
+nTR_shift = 3 # number shift for HRF
+goal_percent_change = 1 # in units of percent
+
+## EXP DESIGN ##
+MASK="L_AMYG_thrp5_bin_resampled.nii.gz"
+MNI_ref_BOLD="mni_icbm152_t1_tal_nlin_asym_09c_BOLD_brain.nii.gz"
+
+## EXP DESIGN ##
+buildImgPath = true
+serverDataDir = "data/server"
+findNewestPatterns = true
+watchFilePattern = "*.dcm"
+minExpectedDicomSize = 300000
+retrieveServerFiles = false
+enforceDeadlines = true
+calcClockSkewIters = 30
+# Specify default run numbers
+runNum = [1,2]
+scanNum = [13,14]
+totalNumberRuns = 1
+NEUTRAL = 1
+OBJECT = 2
+HAPPY = 3
+FEARFUL = 4
+
+
+## DISPLAY PARAMETERS ##
+[display]
+debug = 0
+useButtonBox = 1
+rtData = 1
+usePython = 1
+
+# ON LOCAL (INTEL LINUX)
+[intelrt]
+imgDir = "/Data1/subjects/"
+codeDir = "/Data1/code/rt-cloud/projects/faceMatching/"
+maskDir="/Data1/code/utils_faceMatching/faceMatching_masks/"
+dicomNamePattern = "001_0000{}_000{}.dcm"
+
+# ON CLOUD VM (WHEN USING CLOUD)
+[cloud]
+codeDir = "/home/amennen/code/rt-cloud/projects/faceMatching/"
+maskDir = "/home/amennen/utils/faceMatching_masks"
+
+# ON CLUSTER 
+[cluster]
+codeDir = "/jukebox/norman/amennen/github/brainiak/rt-cloud/projects/faceMatching"
+clusterBidsDir="/jukebox/norman/amennen/RT_prettymouth/data/bids/Norman/Mennen/5516_greenEyes"
+imgDir = "/jukebox/norman/amennen/github/brainiak/rt-cloud/projects/faceMatching/dicomDir"
+dicomNamePattern = "001_0000{}_000{}.dcm"
+maskDir = "/jukebox/norman/amennen/github/brainiak/rt-cloud/projects/faceMatching/ROI"
+
+
+
