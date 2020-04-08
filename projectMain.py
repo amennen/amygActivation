@@ -11,7 +11,7 @@ from rtCommon.utils import loadConfigFile, installLoggers
 from rtCommon.structDict import StructDict
 from rtCommon.projectInterface import Web
 
-defaultConfig = os.path.join(currPath, 'conf/faceMatching_organized.toml')
+defaultConfig = os.path.join(currPath, 'conf/amygActivation_cluster.toml')
 
 
 if __name__ == "__main__":
@@ -24,8 +24,8 @@ if __name__ == "__main__":
                            help='experiment file (.json or .toml)')
     args = argParser.parse_args()
     # HERE: Set the path to the fMRI Python script to run here
-    params = StructDict({'fmriPyScript': 'projects/faceMatching/faceMatching.py',
-                         'filesremote': args.filesremote,
+    params = StructDict({'fmriPyScript': 'projects/amygActivation/amygActivation.py',
+                         'filesremote': args.filesremote, 'port': 16843,
                          })
 
     cfg = loadConfigFile(args.config)
