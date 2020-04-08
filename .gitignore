@@ -1,5 +1,5 @@
 conf/*
-data/
-ROI/
-display/data/
-dicomDir/
+data/*
+ROI/*
+display/data/*
+dicomDir/*
