@@ -4,7 +4,7 @@ import os
 import glob
 import numpy as np
 import json	
-import datetime
+from datetime import datetime
 from dateutil import parser
 from subprocess import call
 import time
@@ -21,102 +21,19 @@ import shutil
 
 
 #WHEN TESTING
-sys.path.append('/jukebox/norman/amennen/github/brainiak/rt-cloud')
+sys.path.append('/Users/amennen/github/rt-cloud/')
 # UNCOMMENT WHEN NO LONGER TESTING
 # currPath = os.path.dirname(os.path.realpath(__file__))
 # rootPath = os.path.dirname(os.path.dirname(currPath))
 # sys.path.append(rootPath)
-from rtCommon.utils import loadConfigFile, dateStr30, DebugLevels, writeFile, loadMatFile
+import rtCommon.utils as utils
 from rtCommon.readDicom import readDicomFromBuffer, readRetryDicomFromFileInterface
 from rtCommon.fileClient import FileInterface
 import rtCommon.projectUtils as projUtils
 from rtCommon.structDict import StructDict
 import rtCommon.dicomNiftiHandler as dnh
-# in tests directory can see test script
-
+from initialize import initialize
 logLevel = logging.INFO
-
-def initializeAmygActivation(configFile, args):
-    # load subject information
-    # create directories for new niftis
-    # purpose: load information and add to configuration things that you won't want to do each time a new file comes in
-    # TO RUN AT THE START OF EACH RUN
-
-    cfg = loadConfigFile(configFile)
-    if cfg.sessionId in (None, '') or cfg.useSessionTimestamp is True:
-        cfg.useSessionTimestamp = True
-        cfg.sessionId = dateStr30(time.localtime())
-    else:
-        cfg.useSessionTimestamp = False
-    # MERGE WITH PARAMS
-    if args.runs != '' and args.scans != '':
-        # use the run and scan numbers passed in as parameters
-        cfg.runNum = [int(x) for x in args.runs.split(',')]
-        cfg.scanNum = [int(x) for x in args.scans.split(',')]
-    else: # when you're not specifying on the command line it's already in a list
-        cfg.runNum = [int(x) for x in cfg.runNum]
-        cfg.scanNum = [int(x) for x in cfg.scanNum]
-    # GET DICOM DIRECTORY
-    
-    if cfg.buildImgPath:
-        imgDirDate = datetime.datetime.now()
-        dateStr = cfg.date.lower()
-        if dateStr != 'now' and dateStr != 'today':
-            try:
-                imgDirDate = parser.parse(cfg.date)
-            except ValueError as err:
-                raise RequestError('Unable to parse date string {} {}'.format(cfg.date, err))
-        datestr = imgDirDate.strftime("%Y%m%d")
-        imgDirName = "{}.{}.{}".format(datestr, cfg.subjectName, cfg.subjectName)
-        if cfg.mode != 'debug':
-            cfg.dicomDir = os.path.join(cfg.intelrt.imgDir, imgDirName)
-            cfg.dicomNamePattern = cfg.intelrt.dicomNamePattern
-        else:
-            cfg.dicomDir = os.path.join(cfg.cluster.imgDir, imgDirName)
-            cfg.dicomNamePattern = cfg.cluster.dicomNamePattern
-    else: # if you're naming the full folder directly
-        if cfg.mode != 'debug':
-            cfg.dicomDir = cfg.intelrt.imgDir # then the whole path was supplied
-            cfg.dicomNamePattern = cfg.intelrt.dicomNamePattern
-        else:
-            cfg.dicomDir = cfg.cluster.imgDir
-            cfg.dicomNamePattern = cfg.cluster.dicomNamePattern
-
-	########
-    cfg.bids_id = 'sub-{0:03d}'.format(cfg.subjectNum)
-    cfg.ses_id = 'ses-{0:02d}'.format(cfg.subjectDay)
-    if cfg.mode == 'local':
-        # then all processing is happening on linux too
-        cfg.dataDir = cfg.intelrt.codeDir + 'data'
-        cfg.mask_filename = os.path.join(cfg.intelrt.maskDir, cfg.MASK)
-        cfg.MNI_ref_filename = os.path.join(cfg.intelrt.maskDir, cfg.MNI_ref_BOLD)
-    elif cfg.mode == 'cloud':
-        cfg.dataDir = cfg.cloud.codeDir + 'data'
-        cfg.mask_filename = os.path.join(cfg.cloud.maskDir, cfg.MASK)
-        cfg.MNI_ref_filename = os.path.join(cfg.cloud.maskDir, cfg.MNI_ref_BOLD)
-        cfg.intelrt.subject_full_day_path = '{0}/data/{1}/{2}'.format(cfg.intelrt.codeDir, cfg.bids_id, cfg.ses_id)
-    elif cfg.mode == 'debug':
-        cfg.dataDir = cfg.cluster.codeDir + '/data'
-        cfg.mask_filename = os.path.join(cfg.cluster.maskDir, cfg.MASK)
-        cfg.MNI_ref_filename = os.path.join(cfg.cluster.maskDir, cfg.MNI_ref_BOLD)
-
-	
-    cfg.subject_full_day_path = '{0}/{1}/{2}'.format(cfg.dataDir, cfg.bids_id, cfg.ses_id)
-    cfg.subject_reg_dir = '{0}/registration_outputs/'.format(cfg.subject_full_day_path)
-    # check that this directory exists
-    if not os.path.exists(cfg.subject_reg_dir):
-        os.mkdir(cfg.subject_reg_dir)
-        print('CREATING REGISTRATION DIRECTORY %s' % cfg.subject_reg_dir)
-	# REGISTRATION THINGS
-    cfg.wf_dir = '{0}/{1}/ses-{2:02d}/registration/'.format(cfg.dataDir, cfg.bids_id, 1)
-    cfg.BOLD_to_T1= cfg.wf_dir + 'affine.txt'
-    cfg.T1_to_MNI= cfg.wf_dir + 'ants_t1_to_mniComposite.h5'
-    cfg.ref_BOLD=cfg.wf_dir + 'ref_image.nii.gz'
-
-    # GET CONVERSION FOR HOW TO FLIP MATRICES
-    cfg.axesTransform = getTransform()
-    ###### BUILD SUBJECT FOLDERS #######
-    return cfg
 
 def getRegressorName(runNum):
     """"Return station classification filename"""
@@ -124,10 +41,11 @@ def getRegressorName(runNum):
     filename = "regressor_run-{0:02d}.mat".format(runNum)
     return filename
 
-def makeRunReg(cfg,runNum,runFolder,runFolderLinux,saveMat=1,):
+def makeRunReg(cfg, args, fileInterface, runNum, runFolder, saveMat=1):
     """ make regression for neurofeedback to use """
     # runIndex is 0-based, we'll save as the actual run name
     # get # TRs duration from config file
+    runId = 'run-{0:02d}'.format(runNum)
     nReps = int(cfg.nReps)
     nTR_block = int(cfg.nTR_block)
     total_n_blocks = nReps*3 + 1
@@ -153,10 +71,10 @@ def makeRunReg(cfg,runNum,runFolder,runFolderLinux,saveMat=1,):
         regData = StructDict()
         regData.regressor = regressor
         sio.savemat(full_name, regData, appendmat=False)
-        if cfg.mode == 'cloud':
-            # make sure to save on the local Linux as well if processing on the cloud
-            full_name = "{0}/{1}".format(runFolderLinux,filename)
-            sio.savemat(full_name,regData,appendmat=False)
+        if args.filesremote:
+            # save this back to local machine
+            projUtils.downloadFolderFromCloud(fileInterface,runFolder,cfg.local.subject_full_day_path,deleteAfter=False)
+    # TO DO: put command here to download data to local!
     return regressor
 
 def findConditionTR(regressor, condition):
@@ -164,33 +82,29 @@ def findConditionTR(regressor, condition):
     allTRs = np.argwhere(regressor == condition)[:,0]
     return allTRs
 
-def getTransform():
-	target_orientation = nib.orientations.axcodes2ornt(('L', 'A', 'S'))
-	dicom_orientation = nib.orientations.axcodes2ornt(('P', 'L', 'S'))
-	transform = nib.orientations.ornt_transform(dicom_orientation, target_orientation)
-	return transform
-
-
-def convertToNifti(TRnum, scanNum, cfg, dicomData):
+def convertToNifti(cfg, args, TRnum, scanNum, dicomData):
     #anonymizedDicom = anonymizeDicom(dicomData) # should be anonymized already
     scanNumStr = str(scanNum).zfill(2)
     fileNumStr = str(TRnum).zfill(3)
     expected_dicom_name = cfg.dicomNamePattern.format(scanNumStr, fileNumStr)
-    tempNiftiDir = os.path.join(cfg.dataDir, 'tmp/convertedNiftis/')
+    if args.filesremote:
+        tempNiftiDir = os.path.join(cfg.server.dataDir, 'tmp/convertedNiftis/')
+    else:
+        tempNiftiDir = os.path.join(cfg.local.dataDir, 'tmp/convertedNiftis')
     nameToSaveNifti = expected_dicom_name.split('.')[0] + '.nii.gz'
     fullNiftiFilename = os.path.join(tempNiftiDir, nameToSaveNifti)
     if not os.path.isfile(fullNiftiFilename): # only convert if haven't done so yet (check if doesn't exist)
-       fullNiftiFilename = dnh.saveAsNiftiImage(dicomData, expected_dicom_name, cfg)
+       fullNiftiFilename = dnh.saveAsNiftiImage(dicomData, fullNiftiFilename, cfg)
     else:
         print('SKIPPING CONVERSION FOR EXISTING NIFTI {}'.format(fullNiftiFilename))
     return fullNiftiFilename
-    # ask about nifti conversion or not
 
 def registerNewNiftiToMNI(cfg, full_nifti_name):
     # should operate over each TR
     # needs full path of nifti file to register
     base_nifti_name = full_nifti_name.split('/')[-1].split('.')[0]
     output_nifti_name = '{0}{1}_space-MNI.nii.gz'.format(cfg.subject_reg_dir, base_nifti_name)
+
     if not os.path.isfile(output_nifti_name): # only run this code if the file doesn't exist already
         # (1) run mcflirt with motion correction to align to bold reference
         command = 'mcflirt -in {0} -reffile {1} -out {2}{3}_MC -mats'.format(full_nifti_name, cfg.ref_BOLD, cfg.subject_reg_dir, base_nifti_name)
@@ -231,7 +145,6 @@ def getDicomFileName(cfg, scanNum, fileNum):
     fullFileName = os.path.join(cfg.dicomDir, fileName)
     return fullFileName
 
-
 def getOutputFilename(runId, TRindex):
 	""""Return station classification filename"""
 	filename = "percentChange_run{}_TRindex{}.txt".format(runId, TRindex)
@@ -244,7 +157,7 @@ def getRunFilename(sessionId, runId):
 
 def retrieveLocalFileAndSaveToCloud(localFilePath, pathToSaveOnCloud, fileInterface):
 	data = fileInterface.getFile(localFilePath)
-	writeFile(pathToSaveOnCloud,data)
+	utils.writeFile(pathToSaveOnCloud,data)
 
 def findBadVoxels(cfg, dataMatrix, previous_badVoxels=None):
     # remove bad voxels
@@ -263,10 +176,9 @@ def findBadVoxels(cfg, dataMatrix, previous_badVoxels=None):
     return updated_badVoxels
 
 
-
-def makeRunHeader(cfg, runIndex): 
+def makeRunHeader(cfg, args, runIndex): 
     # Output header 
-    now = datetime.datetime.now() 
+    now = datetime.now() 
     print('**************************************************************************************************')
     print('* amygActivation v.1.0') 
     print('* Date/Time: ' + now.isoformat()) 
@@ -275,8 +187,7 @@ def makeRunHeader(cfg, runIndex):
     print('* Run Number: ' + str(cfg.runNum[runIndex])) 
     print('* Scan Number: ' + str(cfg.scanNum[runIndex])) 
     print('* Real-Time Data: ' + str(cfg.rtData))     
-    print('* Mode: ' + str(cfg.mode)) 
-    print('* Machine: ' + str(cfg.machine)) 
+    print('* Filesremote: ' + str(args.filesremote)) 
     print('* Dicom directory: ' + str(cfg.dicomDir)) 
     print('**************************************************************************************************')
     # prepare for TR sequence 
@@ -288,32 +199,34 @@ def makeTRHeader(cfg, runIndex, TRFilenum, TRindex, percent_change):
         cfg.runNum[runIndex], TRFilenum, TRindex, percent_change))
     return
 
-def createRunFolder(cfg,runNum):
+def createRunFolder(cfg, args, runNum):
     runId = 'run-{0:02d}'.format(runNum)
-    runFolder = cfg.subject_full_day_path + '/' + runId
+    if args.filesremote:
+        runFolder = cfg.server.subject_full_day_path + '/' + runId
+    else:
+        runFolder = cfg.local.subject_full_day_path + '/' + runId
     if not os.path.exists(runFolder):
         os.makedirs(runFolder)
-    runFolderLinux = -1
-    if cfg.mode == 'cloud':
-        # if using cloud, also make this folder on the local Linux machine"
-        runFolderLinux = cfg.intelrt.subject_full_day_path + '/' + runId
-        if not os.path.exists(runFolderLinux):
-            os.makedirs(runFolderLinux)
+    return runFolder
 
-    return runFolder, runFolderLinux
-
-def createTmpFolder(cfg):
-    tempNiftiDir = os.path.join(cfg.dataDir, 'tmp/convertedNiftis/')
+def createTmpFolder(cfg,args):
+    if args.filesremote:
+        tempNiftiDir = os.path.join(cfg.server.dataDir, 'tmp/convertedNiftis/')
+    else:
+        tempNiftiDir = os.path.join(cfg.local.dataDir, 'tmp/convertedNiftis/')
     if not os.path.exists(tempNiftiDir):
         os.makedirs(tempNiftiDir)
     return
 
-def deleteTmpFiles(cfg):
-    tempNiftiDir = os.path.join(cfg.dataDir, 'tmp/convertedNiftis/')
+def deleteTmpFiles(cfg,args):
+    if args.filesremote:
+        tempNiftiDir = os.path.join(cfg.server.dataDir, 'tmp/convertedNiftis/')
+    else:
+        tempNiftiDir = os.path.join(cfg.local.dataDir, 'tmp/convertedNiftis')
     if os.path.exists(tempNiftiDir):
         shutil.rmtree(tempNiftiDir)
         print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-        print('DELETING ALL NIFTIS IN tmp/convertedNiftis')
+        print('DELETING FOLDER AND ALL NIFTIS: tmp/convertedNiftis')
         print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
     return
 
@@ -349,13 +262,10 @@ def split_tol(test_list, tol):
 
 # testing code--debug mode -- run in amygActivation directory
 from amygActivation import *
-defaultConfig = 'conf/amygActivation_cluster.toml'
-params = StructDict({'config':defaultConfig, 'runs': '1', 'scans': '9', 'commpipe': 'None', 'filesremote': False})
-cfg = initializeAmygActivation(params.config, params)
-args = StructDict()
-args.filesremote = False
-
-
+defaultConfig = 'conf/amygActivation.toml'
+args = StructDict({'config':defaultConfig, 'runs': '1', 'scans': '9', 'commpipe': None, 'filesremote': True})
+runIndex=0
+TRFilenum=11
 
 def main():
     logger = logging.getLogger()
@@ -378,12 +288,13 @@ def main():
 
     args = argParser.parse_args()
     print(args)
-    cfg = initializeAmygActivation(args.config, args)
+    cfg = utils.loadConfigFile(args.config)
+    cfg = initialize(cfg, args)
 
-    createTmpFolder(cfg)
+    createTmpFolder(cfg,args)
     # DELETE ALL FILES IF FLAGGED (DEFAULT) # 
     if args.deleteTmpNifti == '1':
-        deleteTmpFiles(cfg)
+        deleteTmpFiles(cfg,args)
     else:
         print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         print('NOT DELETING NIFTIS IN tmp/convertedNiftis')
@@ -394,16 +305,6 @@ def main():
     fileInterface = FileInterface(filesremote=args.filesremote, commPipes=projComm)
     # intialize watching in particular directory
     fileInterface.initWatch(cfg.dicomDir, cfg.dicomNamePattern, cfg.minExpectedDicomSize) 
-    # Young 2014 run struture:
-    # blocks of rest, happy, count each 40 seconds
-    # continuous feedback during the whole happy block
-    # no feedback condition - same happy task but no feedback 
-    # we're going to have even/odd judgements instead of counting down so it's not stressful
-    # 13 blocks of 40 seconds each = 520 seconds (347 TRs) - put 10 TRs from first trigger and then 5 at the end
-    # 362 TRs total
-
-    # let's make them 42 seconds each for the TRs to be right --> 379 TRs total
-
 
     #### MAIN PROCESSING ###
     nRuns = len(cfg.runNum)
@@ -418,12 +319,12 @@ def main():
         # 6. save as a text file (Every TR-- display can smooth it)
         
         runNum = cfg.runNum[runIndex]# this will be 1-based now!! it will be the actual run number in case it's out of order
-        makeRunHeader(cfg, runIndex)
+        makeRunHeader(cfg, args, runIndex)
         run = cfg.runNum[runIndex]
         # create run folder
-        runFolder, runFolderLinux = createRunFolder(cfg,runNum)
+        runFolder = createRunFolder(cfg, args, runNum)
         scanNum = cfg.scanNum[runIndex]
-        regressor = makeRunReg(cfg,runNum,runFolder,runFolderLinux,saveMat=1)
+        regressor = makeRunReg(cfg, args, fileInterface, runNum, runFolder, saveMat=1)
 
         happy_TRs = findConditionTR(regressor,int(cfg.HAPPY))
         happy_TRs_shifted = happy_TRs  + cfg.nTR_shift
@@ -441,7 +342,6 @@ def main():
         runData.percent_change[:] = np.nan
         runData.badVoxels = np.array([])
         
-
         TRindex = 0
         for TRFilenum in np.arange(cfg.nTR_skip+1, cfg.nTR_run+1): # iterate through all TRs
             if TRFilenum == cfg.nTR_skip+1: # wait until run starts
@@ -450,8 +350,8 @@ def main():
                 timeout_file = 5
             A = time.time()
             dicomData = readRetryDicomFromFileInterface(fileInterface, getDicomFileName(cfg, scanNum, TRFilenum), timeout=timeout_file)
-            full_nifti_name = convertToNifti(TRFilenum, scanNum, cfg, dicomData)
-            registeredFileName = registerNewNiftiToMNI(cfg, full_nifti_name)
+            full_nifti_name = convertToNifti(cfg, args, TRFilenum, scanNum, dicomData)
+            registeredFileName = registerNewNiftiToMNI(cfg, full_nifti_name) # TO DO: Left off here!!
             maskedData = apply_mask(registeredFileName, cfg.mask_filename)
             runData.all_data[:, TRindex] = maskedData
             B = time.time()

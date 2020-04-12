@@ -11,8 +11,10 @@ from rtCommon.utils import loadConfigFile, installLoggers
 from rtCommon.structDict import StructDict
 from rtCommon.projectInterface import Web
 
-defaultConfig = os.path.join(currPath, 'conf/amygActivation_cluster.toml')
-
+defaultConfig = os.path.join(currPath, 'conf/amygActivation.toml')
+expScript = os.path.join(currPath, 'amygActivation.py')
+initScript = os.path.join(currPath, 'initialize.py')
+finalizeScript = os.path.join(currPath, 'finalize.py')
 
 if __name__ == "__main__":
     installLoggers(logging.INFO, logging.INFO, filename=os.path.join(currPath, 'logs/webServer.log'))
@@ -24,8 +26,11 @@ if __name__ == "__main__":
                            help='experiment file (.json or .toml)')
     args = argParser.parse_args()
     # HERE: Set the path to the fMRI Python script to run here
-    params = StructDict({'fmriPyScript': 'projects/amygActivation/amygActivation.py',
-                         'filesremote': args.filesremote, 'port': 16843,
+    params = StructDict({'fmriPyScript': expScript,
+                         'initScript': initScript,
+                         'finalizeScript': finalizeScript,
+                         'filesremote': args.filesremote, 
+                         'port': 8888,
                          })
 
     cfg = loadConfigFile(args.config)
