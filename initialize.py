@@ -108,8 +108,10 @@ def initialize(cfg, args):
 #     print('***************************************')
 #     print('MAKE SURE YOU HAVE ALREADY TRANSFERRED FMRIPREP REGISTRATION OUTPUTS HERE TO %s' % cfg.local.wf_dir)
 #     print('IF YOUR FMRIPREP WORK/WORKFLOW DIR IS wf_dir, FIND OUTPUTS IN:')
-#     print('T1->MNI: wf_dir/func_preproc_ses_01_task_examplefunc_run_01_wf/bold_reg_wf/bbreg_wf/fsl2itk_fwd/affine.txt')
+#     print('T1->MNI: wf_dir/anat_preproc_wf/t1_2_mni/ants_t1_to_mniComposite.h5')
 #     print('BOLD->T1: wf_dir/func_preproc_ses_01_task_examplefunc_run_01_wf/bold_reg_wf/bbreg_wf/fsl2itk_fwd/affine.txt')
+#     print('T1=>BOLD: wf_dir/func_preproc_ses_01_task_examplefunc_run_01_wf/bold_reg_wf/bbreg_wf/fsl2itk_inv/affine.txt')
+#     print('MNI=>T1: wf_dir/anat_preproc_wf/t1_2_mni/ants_t1_to_mniInverseComposite.h5 ')
 #     print('example func: wf_dir/func_preproc_ses_01_task_examplefunc_run_01_wf/bold_reference_wf/gen_ref/ref_image.nii.gz')
 #     return 
 
