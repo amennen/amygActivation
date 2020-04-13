@@ -22,6 +22,7 @@ rootPath = os.path.dirname(os.path.dirname(currPath))
 sys.path.append(rootPath)
 #WHEN TESTING: UNCOMMENT TO ADD PATH TO RT-CLOUD
 #sys.path.append('/Users/amennen/github/rt-cloud/')
+#sys.path.append('/jukebox/norman/amennen/github/brainiak/rt-cloud/')
 
 import rtCommon.utils as utils
 from rtCommon.fileClient import FileInterface
@@ -89,8 +90,8 @@ def initialize(cfg, args):
         cfg.wf_dir = cfg.server.wf_dir
     cfg.ref_BOLD = cfg.wf_dir + '/' + 'ref_image.nii.gz'
     cfg.MNI_ref_filename = cfg.wf_dir + '/' + cfg.MNI_ref_BOLD 
-    cfg.BOLD_to_T1 = cfg.wf_dir + '/' + 'affine.txt'
-    cfg.T1_to_MNI = cfg.wf_dir + '/' + 'ants_t1_to_mniComposite.h5'
+    cfg.T1_to_BOLD = cfg.wf_dir + '/' + 'affine.txt'
+    cfg.MNI_to_T1 = cfg.wf_dir + '/' + 'ants_t1_to_mniInverseComposite.h5'
     # get conversion to flip dicom to nifti files
     cfg.axesTransform = getTransform(('L', 'A', 'S'),('P', 'L', 'S'))
     return cfg
@@ -128,8 +129,9 @@ def buildSubjectFoldersOnServer(cfg):
     return 
 
 ####################################################################################
-# defaultConfig = 'conf/amygActivation.toml'
-# args = StructDict({'config':defaultConfig, 'runs': '1', 'scans': '9', 'commpipe': None, 'filesremote': True})
+from initialize import *
+defaultConfig = 'conf/amygActivation.toml'
+args = StructDict({'config':defaultConfig, 'runs': '1', 'scans': '9', 'commpipe': None, 'filesremote': True})
 ####################################################################################
 
 def main(argv=None):

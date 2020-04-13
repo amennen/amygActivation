@@ -99,14 +99,19 @@ def convertToNifti(cfg, args, TRnum, scanNum, dicomData):
         print('SKIPPING CONVERSION FOR EXISTING NIFTI {}'.format(fullNiftiFilename))
     return fullNiftiFilename
 
-def registerMNIToNewNifti(cfg, full_nifti_name):
+def registerMNIToNewNifti(cfg, args, full_nifti_name):
     # this will take given masks in MNI space and register to that days ex func scan
+    base_ROI_name = cfg.MASK.split('.')[0]
+    if args.filesremote:
+        full_ROI_path = cfg.server.maskDir + '/' + cfg.MASK
+    else:
+        full_ROI_path = cfg.local.maskDir + '/' + cfg.MASK
     base_nifti_name = full_nifti_name.split('/')[-1].split('.')[0]
-    output_nifti_name = '{0}{1}_space-MNI.nii.gz'.format(cfg.subject_reg_dir, base_nifti_name)
+    output_nifti_name = '{0}/{1}_space-native.nii.gz'.format(cfg.subject_reg_dir, base_ROI_name)
 
     if not os.path.isfile(output_nifti_name): # only run this code if the file doesn't exist already
         # (1) run mcflirt with motion correction to align ex func --> new func
-        command = 'mcflirt -in {1} -reffile {0} -out {2}{3}_MC -mats'.format(full_nifti_name, cfg.ref_BOLD, cfg.subject_reg_dir, base_nifti_name)
+        command = 'mcflirt -in {1} -reffile {0} -out {2}/exfunc_2_{3} -mats'.format(full_nifti_name, cfg.ref_BOLD, cfg.subject_reg_dir, base_nifti_name)
         #print('(1) ' + command)
         A = time.time()
         call(command, shell=True)
@@ -114,7 +119,7 @@ def registerMNIToNewNifti(cfg, full_nifti_name):
         print(B-A)
 
         # (2) run c3daffine tool to convert .mat to .txt
-        command = 'c3d_affine_tool -ref {0} -src {1} {2}{3}_MC.mat/MAT_0000 -fsl2ras -oitk {4}{5}_2ref.txt'.format(cfg.ref_BOLD, full_nifti_name, cfg.subject_reg_dir, base_nifti_name, cfg.subject_reg_dir, base_nifti_name)
+        command = 'c3d_affine_tool -ref {1} -src {0} {2}/exfunc_2_{3}.mat/MAT_0000 -fsl2ras -oitk {4}/exfunc_2_{5}_2ref.txt'.format(cfg.ref_BOLD, full_nifti_name, cfg.subject_reg_dir, base_nifti_name, cfg.subject_reg_dir, base_nifti_name)
         #print('(2) ' + command)
         A = time.time()
         call(command, shell=True)
@@ -127,7 +132,7 @@ def registerMNIToNewNifti(cfg, full_nifti_name):
         # transform MNI to T1
         # transform T1 to BOLD
         # transform BOLD to BOLD
-        command = 'antsApplyTransforms --default-value 0 --float 1 --interpolation LanczosWindowedSinc -d 3 -e 3 --input {0} --reference-image {1} --output {2}{3}_space-native.nii.gz --transform {4}{5}_2ref.txt --transform {6} --transform {7} -v 1'.format(full_nifti_name, cfg.MNI_ref_filename, cfg.subject_reg_dir, base_nifti_name, cfg.subject_reg_dir, base_nifti_name, cfg.BOLD_to_T1, cfg.T1_to_MNI)
+        command = 'antsApplyTransforms --default-value 0 --float 1 --interpolation NearestNeighbor -d 3 -e 3 --input {0} --reference-image {1} --output {2}/{3}_space-native.nii.gz  --transform {7} --transform {6} --transform {4}/exfunc_2_{5}_2ref.txt -v 1'.format(full_ROI_path, full_nifti_name, cfg.subject_reg_dir, base_ROI_name, cfg.subject_reg_dir, base_nifti_name, cfg.T1_to_BOLD, cfg.MNI_to_T1)
         #print('(3) ' + command)
         A = time.time()
         call(command, shell=True)
