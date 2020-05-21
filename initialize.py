@@ -1,4 +1,6 @@
-# Purpose: get experiment ready
+# Purpose: finalize experiment when you're done running for the day
+# Add whatever you want to do, but typically first we should make sure to 
+# move and delete all sever data
 
 import os
 import glob
@@ -78,6 +80,7 @@ def initialize(cfg, args):
     cfg.local.maskDir = cfg.local.codeDir + '/' + 'ROI'
     cfg.subject_reg_dir = cfg.local.subject_reg_dir
     cfg.wf_dir = cfg.local.wf_dir
+    cfg.n_masks = len(cfg.MASK)
 
     if args.filesremote: # here we will need to specify separate paths for processing
         cfg.server.codeDir = cfg.server.rtcloudDir + '/projects' + '/' + cfg.projectName + '/'
@@ -89,9 +92,15 @@ def initialize(cfg, args):
         cfg.subject_reg_dir = cfg.server.subject_reg_dir
         cfg.wf_dir = cfg.server.wf_dir
     cfg.ref_BOLD = cfg.wf_dir + '/' + 'ref_image.nii.gz'
+    #cfg.ref_BOLD = cfg.subject_reg_dir + '/' + 'ref_BOLD2.nii.gz'
     cfg.MNI_ref_filename = cfg.wf_dir + '/' + cfg.MNI_ref_BOLD 
     cfg.T1_to_BOLD = cfg.wf_dir + '/' + 'affine.txt'
     cfg.MNI_to_T1 = cfg.wf_dir + '/' + 'ants_t1_to_mniInverseComposite.h5'
+    cfg.MASK_transformed = [''] * cfg.n_masks
+    cfg.local_MASK_transformed = [''] * cfg.n_masks
+    for m in np.arange(cfg.n_masks):
+        cfg.MASK_transformed[m] = cfg.subject_reg_dir + '/' + cfg.MASK[m].split('.')[0] + '_space-native.nii.gz'
+        cfg.local_MASK_transformed[m] = cfg.local.subject_reg_dir + '/' + cfg.MASK[m].split('.')[0] + '_space-native.nii.gz'
     # get conversion to flip dicom to nifti files
     cfg.axesTransform = getTransform(('L', 'A', 'S'),('P', 'L', 'S'))
     return cfg
@@ -129,9 +138,9 @@ def buildSubjectFoldersOnServer(cfg):
     return 
 
 ####################################################################################
-from initialize import *
-defaultConfig = 'conf/amygActivation.toml'
-args = StructDict({'config':defaultConfig, 'runs': '1', 'scans': '9', 'commpipe': None, 'filesremote': True})
+# from initialize import *
+# defaultConfig = 'conf/amygActivation.toml'
+# args = StructDict({'config':defaultConfig, 'runs': '1', 'scans': '9', 'commpipe': None, 'filesremote': True})
 ####################################################################################
 
 def main(argv=None):
@@ -181,8 +190,12 @@ def main(argv=None):
         # next, transfer transformation files from local --> server for online processing
         projUtils.uploadFolderToCloud(fileInterface,cfg.local.wf_dir,cfg.server.wf_dir)
 
-        # upload ROI folder to cloud server
-        projUtils.uploadFolderToCloud(fileInterface,cfg.local.maskDir,cfg.server.maskDir)
+        # upload ROI folder to cloud server - we would need to do this if we were using
+        # a standard mask, but we're not in this case
+        #projUtils.uploadFolderToCloud(fileInterface,cfg.local.maskDir,cfg.server.maskDir)
+
+        # upload all transformed masks to the cloud
+        projUtils.uploadFilesFromList(fileInterface,cfg.local_MASK_transformed,cfg.subject_reg_dir)
     return 0
 
 if __name__ == "__main__":

@@ -10,7 +10,6 @@ function RealTimeAmygActivation_CLOUD(toml_file, runNum)
 %toml_file = '/Data1/code/rt-cloud/projects/greenEyes/conf/greenEyes_organized.toml';
 %toml_file = '/Volumes/norman/amennen/github/brainiak/rt-cloud/projects/greenEyes/conf/greenEyes_cluster.toml';
 %runNum = 1;
-
 addpath(genpath('matlab-toml'));
 raw_text = fileread(toml_file);
 cfg = toml.decode(raw_text);
@@ -24,35 +23,22 @@ runId = sprintf('run-%02d',runData.run);
 
 debug = cfg.display.debug;
 useButtonBox = cfg.display.useButtonBox;
-if strcmp(cfg.machine, 'intel')
-    fmri = 1;
-else
-    fmri = 0;
-end
 rtData = cfg.display.rtData; % if this is 0, then have a practice/transfer run but no neurofeedback
-usepython = cfg.display.usePython;
 
-
-addpath(genpath('stimuli'))
-
-if fmri == 1 % this is just if you're in the scanner room or not but it will always look for triggers
-    repo_path ='/Data1/code/rt-cloud/projects/amygActivation/';
-else
-    repo_path = '/Volumes/norman/amennen/github/brainiak/rt-cloud/projects/amygActivation/';
-end
+repo_path = [cfg.local.rtcloudDir '/projects/amygActivation/'];
 fmri_path = [repo_path 'data' '/' bidsId '/' sesId];
 display_path = [repo_path 'display'];
 cd(display_path);
 data_path = fullfile(display_path,['data/' bidsId]);
-runHeader = fullfile(data_path, runId);
-if ~exist(runHeader)
-    mkdir(runHeader)
+% run directory controlling the display and display data
+runDir_display = fullfile(data_path, sesId,runId);
+if ~exist(runDir_display)
+    mkdir(runDir_display)
 end
-
-classOutputDir = [repo_path 'data' '/' bidsId '/'  'ses-02' '/'];
-%classOutputDir = [runHeader '/classoutput'];
-if ~exist(classOutputDir)
-    mkdir(classOutputDir)
+% this is the run dir from the processing pipeline
+runDir_rtcloud = [repo_path 'data' '/' bidsId '/'  sesId '/' runId '/'];
+if ~exist(runDir_rtcloud)
+    mkdir(runDir_rtcloud)
 end
 %%
 %initialize system time calls
@@ -60,7 +46,7 @@ seed = sum(100*clock); %get random seed
 GetSecs;
 
 % open and set-up output file
-dataFile = fopen([runHeader '/behavior.txt'],'a');
+dataFile = fopen([runDir_display '/behaviorLog.txt'],'a');
 fprintf(dataFile,'\n*********************************************\n');
 fprintf(dataFile,'* AmygActivation v.1.0\n');
 fprintf(dataFile,['* Date/Time: ' datestr(now,0) '\n']);
@@ -88,8 +74,8 @@ fprintf('*********************************************\n\n');
 
 %% Initalizing scanner parameters
 
-disdaqs = 15; % how many seconds to drop at the beginning of the run
 TR = 1.5; % seconds per volume
+disdaqs = cfg.nTR_skip*TR; % how many seconds to drop at the beginning of the run
 nTRs_run = cfg.nTR_run;
 
 % so we want 379 TRs total with the beginning 10 TRs
@@ -115,7 +101,7 @@ KbName('UnifyKeyNames');
 LEFT = KbName('1!');
 subj_keycode = LEFT;
 RIGHT = KbName('2@');
-%TRIGGER = '5%'; % for Penn/rtAttention experiment at Princeton
+%TRIGGER = '5%'; % for Penn
 TRIGGER ='=+'; %put in for Princeton scanner -- default setup
 TRIGGER_keycode = KbName(TRIGGER);
 probe_keys = [LEFT RIGHT];
@@ -134,41 +120,41 @@ end
 
 % set default device to be -1
 DEVICE = -1;
-if useButtonBox && (~debug)
-    DEVICENAME = 'Current Designs, Inc. 932';
-    [index devName] = GetKeyboardIndices;
-    for device = 1:length(index)
-        if strcmp(devName(device),DEVICENAME)
-            DEVICE = index(device);
-        end
-    end
-elseif ~useButtonBox && fmri
-    % let's set it to look for the Dell keyboard instead
-    DEVICENAME = 'Dell KB216 Wired Keyboard';
-    [index devName] = GetKeyboardIndices;
-    for device = 1:length(index)
-        if strcmp(devName(device),DEVICENAME)
-            DEVICE = index(device);
-        end
-    end
-end
-
-
-
-% CIRCLE PARAMETERS + FONT SIZE GOES HERE
-circleRadius=100;
-restCircleColor=[196 193 192];
-recordingCircleColor=[179 30 25];
-maxGreenCircleColor=[90 204 2];
-badColor = 50*[1 1 1];
+%%% update the code here to add the button box device,
+%%% or custom keyboard. setting a specific number will
+%%% help the code look for new triggers faster.
+%%% to see all possible USB keyboards, run
+%%% [index devName] = GetKeyboardIndices
+%%% and look at all the devNames
+% BUTTON_BOX_DEVICENAME = [];
+% if useButtonBox && (~debug)
+%     DEVICENAME = 'Current Designs, Inc. 932';
+%     [index devName] = GetKeyboardIndices;
+%     for device = 1:length(index)
+%         if strcmp(devName(device),DEVICENAME)
+%             DEVICE = index(device);
+%         end
+%     end
+% elseif ~useButtonBox && fmri
+%     % let's set it to look for the Dell keyboard instead
+%     DEVICENAME = 'Dell KB216 Wired Keyboard';
+%     [index devName] = GetKeyboardIndices;
+%     for device = 1:length(index)
+%         if strcmp(devName(device),DEVICENAME)
+%             DEVICE = index(device);
+%         end
+%     end
+% end
 
 % RECTANGLE PARAMETERS GO HERE
 rectWidth = 100;
 rectHeight = 300;
-
-circleFontSize = 60;
-feedbackDur = 2; % seconds - how long to show feedback
+restColor=[196 193 192];
+maxGreenColor=[90 204 2];
+badColor = 50*[1 1 1];
+rectFontSize = 60;
 deltat = .1;
+wrapChars=50;
 %% Initialize Screens
 
 screenNumbers = Screen('Screens');
@@ -182,23 +168,24 @@ end
 
 %retrieve the size of the display screen
 if debug
-    screenX = 1200;
-    screenY = 1200;
+    screenX = 800;
+    screenY = 800;
 else
     % first just make the screen tiny
     
     [screenX screenY] = Screen('WindowSize',screenNum);
     % put this back in!!!
-    windowSize.degrees = [51 30];
-    resolution = Screen('Resolution', screenNum);
-    %resolution = Screen('Resolution', 0); % REMOVE THIS AFTERWARDS!!
+    
+    % if you're using 2 monitors, and you just want half of the screen
+    % width to be used, use this command:
+    %resolution = Screen('Resolution', screenNum);
     %windowSize.pixels = [resolution.width/2 resolution.height];
     %screenX = windowSize.pixels(1);
     %screenY = windowSize.pixels(2);
-    % new: setting resolution manually
+    % OR, set it manually if you know the resolution of the projector
     % for PRINCETON
-    screenX = 1280;
-    screenY = 720;
+    %screenX = 1280;
+    %creenY = 720;
     %     %to ensure that the images are standardized (they take up the same degrees of the visual field) for all subjects
     %     if (screenX ~= ScreenResX) || (screenY ~= ScreenResY)
     %         fprintf('The screen dimensions may be incorrect. For screenNum = %d,screenX = %d (not 1152) and screenY = %d (not 864)',screenNum, screenX, screenY);
@@ -214,7 +201,6 @@ centerX = screenX/2; centerY = screenY/2;
 Screen(mainWindow,'TextFont',textFont);
 Screen(mainWindow,'TextSize',textSize);
 fixDotRect = [centerX-fixationSize,centerY-fixationSize,centerX+fixationSize,centerY+fixationSize];
-circleDotRect = [centerX-circleRadius,centerY-circleRadius,centerX+circleRadius,centerY+circleRadius];
 rect = [centerX-rectWidth/2,centerY-rectHeight/2,centerX+rectWidth/2,centerY+rectHeight/2];
 lineW=100;
 penW=10;
@@ -224,20 +210,20 @@ Priority(MaxPriority(screenNum));
 
 %% LOAD IN THE REGRESSOR MATRIX%%
 
-regressor_filename = [fmri_path '/' 'regressor_' runId '.mat']; % THESE ARE NOT SHIFTED FOR THE HRF!!!
+regressor_filename = [runDir_rtcloud '/' 'regressor_' runId '.mat']; % THESE ARE NOT SHIFTED FOR THE HRF!!!
 regressor_struct = load(regressor_filename);
 regressor = regressor_struct.regressor;
 nTRs_task = length(regressor);
 happyTRs_display = find(regressor == cfg.HAPPY); % actual files wer're going to use to test classifier
 happyTRs_shifted = happyTRs_display + cfg.nTR_shift;
+mathTRs_display = find(regressor == cfg.MATH);
+% make a vector with all TRs where you'll be looking for a file
 recordedTRs = zeros(nTRs_task,1);
-recordedTRs(happyTRs_shifted) = 1;
-
-% recorded TRs = display
-% stationTRs = classification TRs
-% make all look TRs during recording parts 0
+recordedTRs(happyTRs_shifted) = 1; % we're only giving feedback during happy TRs
 runData.feedbackScore = NaN(nTRs_task,1);
+runData.feedbackScoreSmoothed = NaN(nTRs_task,1);
 runData.feedbackGiven = {};
+runData.rtData = rtData;
 %% show them instructions until they press to begin
 continueInstruct = '\n\n-- Please press your INDEX to continue once you understand these instructions. --';
 startInstruct = '\n\n-- Please press your INDEX to start the task once you are ready to begin. --';
@@ -256,30 +242,34 @@ firstRun = ['Welcome to the task!\n\nToday you will be trying to maximize the ba
 if runData.run == 1
     % show the first instructions
     firstInstruct = [firstRun continueInstruct];
-    DrawFormattedText(mainWindow,firstInstruct,'center','center',textColor,70,[],[],1.2);
+    DrawFormattedText(mainWindow,firstInstruct,'center','center',textColor,wrapChars,[],[],1.2);
     Screen('Flip',mainWindow);
     waitForKeyboard(subj_keycode,DEVICE);
 end
 
-reminder = ['Remember, try to think of happy memories to increase the bar height and increase reward.'];
+reminder = ['Remember, when you see "HAPPY", think of happy memories to increase the bar height and, thus, increase reward.'];
 reminderInstruct = [reminder continueInstruct];
-DrawFormattedText(mainWindow,reminderInstruct,'center','center',textColor,70,[],[],1.2);
+DrawFormattedText(mainWindow,reminderInstruct,'center','center',textColor,wrapChars,[],[],1.2);
 Screen('Flip',mainWindow);
 waitForKeyboard(subj_keycode,DEVICE);
 
-% now tell them they will listen again and ge
 nextInstruct = ['Please stay focused, and use your neurofeedback to keep trying to maximize the signal.' continueInstruct];
-DrawFormattedText(mainWindow,nextInstruct,'center','center',textColor,70,[],[],1.2);
+DrawFormattedText(mainWindow,nextInstruct,'center','center',textColor,wrapChars,[],[],1.2);
+Screen('Flip',mainWindow);
+waitForKeyboard(subj_keycode,DEVICE);
+
+% now tell them about the math blocks
+nextInstruct = ['When you see "MATH" and a number inside the bar,\npress your INDEX or MIDDLE finger\nfor an even or odd number.' continueInstruct];
+DrawFormattedText(mainWindow,nextInstruct,'center','center',textColor,wrapChars,[],[],1.2);
 Screen('Flip',mainWindow);
 waitForKeyboard(subj_keycode,DEVICE);
 
 
 nextInstruct = ['Remember to take breaks before starting the task so you can succeed on your mission!' startInstruct];
-DrawFormattedText(mainWindow,nextInstruct,'center','center',textColor,70,[],[],1.2);
+DrawFormattedText(mainWindow,nextInstruct,'center','center',textColor,wrapChars,[],[],1.2);
 Screen('Flip',mainWindow);
 waitForKeyboard(subj_keycode,DEVICE);
 
-%waitForKeyboard(subj_keycode,DEVICE);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % now here we're adding to say waiting for scanner, hold tight!
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -300,7 +290,7 @@ STILLDURATION = 6;
 if (~debug )
     timing.trig.wait = WaitTRPulse(TRIGGER_keycode,DEVICE);
     runStart = timing.trig.wait;
-    DrawFormattedText(mainWindow,STILLREMINDER,'center','center',textColor,70);
+    DrawFormattedText(mainWindow,STILLREMINDER,'center','center',textColor,wrapChars);
     startTime = Screen('Flip',mainWindow);
     elapsedTime = 0;
     while (elapsedTime < STILLDURATION)
@@ -312,8 +302,8 @@ else
 end
 
 Screen(mainWindow,'FillRect',backColor);
-Screen(mainWindow,'TextSize',circleFontSize); % starts at 30
-DrawFormattedText(mainWindow,'+','center','center',textColor,70);
+Screen(mainWindow,'TextSize',rectFontSize); % starts at 30
+DrawFormattedText(mainWindow,'+','center','center',textColor,wrapChars);
 Screen('Flip', mainWindow);
 Screen(mainWindow,'TextSize',textSize);
 %%
@@ -321,215 +311,188 @@ Screen(mainWindow,'TextSize',textSize);
 % calculate onset of story
 volStart = 1 + disdaqs/TR ; % this should be on the 11th trigger
 taskTRs = volStart:(volStart + nTRs_task - 1); 
-
-% actual playing
-% wait for first trigger
-Screen('FillRect', mainWindow,restCircleColor, rect);
-% maybe move this down inside the for loop?
-
-fprintf('delay is %8.8f\n', timing.plannedOnsets.taskStart-timing.actualOnsets.taskstart)
-
 %% Now record all the triggers from the scanner
 % calculate onsets for all subsequent TRs in the scanner
 % goal: record every trigger during the story
 
-runData.classOutputFileLoad = zeros(nTRs_task);
+runData.OutputFileLoad = zeros(nTRs_task);
 runData.leftPress = NaN(1,nTRs_task);
 runData.leftPressRT = NaN(1,nTRs_task);
 runData.rightPress = NaN(1,nTRs_task);
 runData.rightPressRT = NaN(1,nTRs_task);
 
-timing.plannedOnsets.TRs = runStart + disdaqs + [0 cumsum(repmat(TR, 1,nTRs_task-1))];
+timing.plannedOnsets.TR = runStart + disdaqs + [0 cumsum(repmat(TR, 1,nTRs_task-1))];
 % get all timing for stations starrt
 % then subtract that by 4
-
+timing.actualOnsets.TR = NaN(1,nTRs_task);
+timing.leftPressRT = NaN(nTRs_run,1);
+timing.rightPressRT = NaN(nTRs_run,1);
 runData.pulses = NaN(nTRs_run,1);
+runData.pulses = NaN(nTRs_run,1);
+
 % prepare for trial sequence
 % want displayed: run, volume TR, story TR, tonsset dif, pulse,
-fprintf(dataFile,'%-8s%-8s%-8s%-8s%-8s%-8s%-8s%-8s%-8s%-8s%-8s\n', 'run','block', 'TR', 'taskTR', 'tondiff', 'trig','LEFT', 'RIGHT', 'looking', 'loaded', 'score')
-fprintf('%-8s%-8s%-8s%-8s%-8s%-8s%-8s%-8s%-8s%-8s%-8s\n', 'run', 'block','TR', 'taskTR', 'tondiff', 'trig', 'LEFT', 'RIGHT',  'looking', 'loaded', 'score')
+fprintf(dataFile,'%-8s%-8s%-8s%-8s%-8s%-8s%-8s%-8s%-8s%-8s\n', 'run','block', 'volume', 'iTR', 'tondiff', 'trig','LEFT', 'RIGHT', 'loaded', 'score');
+fprintf('%-8s%-8s%-8s%-8s%-8s%-8s%-8s%-8s%-8s%-8s\n', 'run', 'block','volume', 'iTR', 'tondiff', 'trig', 'LEFT', 'RIGHT',  'loaded', 'score');
 %%
 KbQueueCreate(DEVICE,key_map);
 KbQueueStart;
 KbQueueFlush(DEVICE);
 SHOWINGFEEDBACK = 0;
 Screen(mainWindow,'TextFont',textFont);
-Screen(mainWindow,'TextSize',circleFontSize); % starts at 30
-keep_display = 0;
-for iTR = 1:nTRs_task
-    volCounter = taskTRs(iTR); % what file number this story TR actually is
-    
+Screen(mainWindow,'TextSize',rectFontSize); % starts at 30
+%%%%%%%%%%%%%%%%% get temp bounds for block types centering
+tempBounds_L = Screen('TextBounds', mainWindow, runData.LEFT_PRESS);
+tempBounds_R = Screen('TextBounds', mainWindow, runData.RIGHT_PRESS);
+tempBounds_REST = Screen('TextBounds', mainWindow, 'REST');
+tempBounds_MATH = Screen('TextBounds', mainWindow, 'MATH');
+tempBounds_HAPPY = Screen('TextBounds', mainWindow, 'HAPPY');
+%%%%%%%%%%%%%%%%% get temp bounds for block types centering
 
-    
-    blockType = regressor(iTR); % this will say if it's resting, happy, or math
-    % set the display for each of the block types!
+keep_display = 0;
+initialScore = 0.5;
+blockTypeStr = 'None';
+for iTR = 1:nTRs_task
+    leftPress = 0;
+    rightPress = 0;
+    volCounter = taskTRs(iTR); % what file number this story TR actually is
+    blockType = regressor(iTR); % this will say if it's resting, happy, or math    
+    % set the display for each of the block types BEFORE flipping
     if blockType == cfg.REST
-       % here just show a plus sign 
-        
+       blockTypeStr = 'REST';
+       % here just show the grey bar so don't need to change anything
+       % add text that says rest
+       Screen(mainWindow, 'FillRect', restColor, rect)
+       Screen('drawtext',mainWindow,'REST',centerX - tempBounds_REST(3)/2,centerY-rectHeight/2 - rectHeight/2,textColor);
+        % all trial types will involve the main grey rectangle
+        Screen('FillRect', mainWindow,restColor, rect);
     elseif blockType == cfg.HAPPY
+        blockTypeStr = 'HAPPY';
         % now check if we're doing rtfmri or no (practice, transfer)
-        
-        
-        
+% 
+        if runData.rtData
+            % udpate display
+            % calculate amount to fill in rectangle based on smoothed score
+            mostRecentScore = runData.feedbackScoreSmoothed(iTR-1);
+            % this makes a rectangle that's in proportion to the score
+            feedbackRect = rect;
+            feedbackRect(2) = rect(4) - (rect(4) - rect(2))*mostRecentScore;
+            Screen('drawtext',mainWindow,'HAPPY',centerX - tempBounds_HAPPY(3)/2,centerY-rectHeight/2 - rectHeight/2,textColor);
+            Screen(mainWindow, 'FillRect', restColor, rect)
+            Screen('DrawLine',mainWindow, 0,rect(1)-lineW,centerY,rect(3)+lineW,centerY,[7])
+
+            if ~isnan(mostRecentScore)
+               % this makes a rectangle that's in proportion to the score
+               feedbackRect = rect;
+               feedbackRect(2) = rect(4) - (rect(4) - rect(2))*mostRecentScore;
+                 if mostRecentScore <= 0.5
+                    Screen(mainWindow,'FillRect', badColor, feedbackRect);
+                    bonus_points = sprintf('$%2.2f', 0);
+                else
+                    Screen(mainWindow,'FillRect', maxGreenColor, feedbackRect);
+                    bonus_points = sprintf('$%2.2f', mostRecentScore);
+                end
+                % put bonus score under the rectangle
+                runData.FeedbackGiven{iTR} = bonus_points; % what people will see
+                tempBounds = Screen('TextBounds', mainWindow, bonus_points);
+                Screen('drawtext',mainWindow,bonus_points,centerX - tempBounds(3)/2,feedbackRect(4)+(centerY/10)-tempBounds(4)/2,[0 0 0]);  
+            end
+        else % if a transfer run, just draw the rectangle
+           Screen('drawtext',mainWindow,'HAPPY',centerX - tempBounds_HAPPY(3)/2,centerY-rectHeight/2 - rectHeight/2,textColor);
+           Screen(mainWindow, 'FillRect', restColor, rect)
+        end
         
     elseif blockType == cfg.MATH 
+        blockTypeStr = 'MATH';
         % here we just check for responses and show one number on the
         % screen, having them press for even or odd
-        
-        
+        % have a new number flip with every TR
+        Screen(mainWindow, 'FillRect', restColor, rect)
+        runData.random_number(iTR) = randi(50);
+        random_number_string = sprintf('%i', runData.random_number(iTR));
+        Screen('drawtext',mainWindow,'MATH',centerX - tempBounds_MATH(3)/2,centerY-rectHeight/2 - rectHeight/2,textColor);
+        Screen('drawtext',mainWindow,runData.LEFT_PRESS,centerX - tempBounds_MATH(3)/2 -tempBounds_L(3),centerY-rectHeight/2 - tempBounds_L(4)/2,textColor);
+        Screen('drawtext',mainWindow,runData.RIGHT_PRESS,centerX + tempBounds_MATH(3)/2 ,centerY-rectHeight/2 - tempBounds_R(4)/2,textColor);
+        tempBounds = Screen('TextBounds', mainWindow, random_number_string);
+        Screen('drawtext',mainWindow,random_number_string,centerX -tempBounds(3)/2,centerY - tempBounds(4)/2,textColor);
     end
-    % flip for that TR
-    [timing.trig.pulses(volCounter) runData.pulses(volCounter)] = WaitTRPulse(TRIGGER_keycode,DEVICE,timing.plannedOnsets.TR(iTR));
+    % flip for that TR AND check for any key presses during the PREVIOUS
+    % TR!
+    % so we will store the pulse for the start of the TR
+    % and the key presses for the NEXT TR in which they occur
+    [timing.trig.pulses(volCounter) runData.pulses(volCounter) timing.leftPressRT(volCounter), timing.rightPressRT(volCounter)] = WaitTRPulse_KbQueue(TRIGGER_keycode,DEVICE,timing.plannedOnsets.TR(iTR));
     % put up a plus for the task start
-    timing.actualOnsets.TR = Screen('Flip', mainWindow); % show the rectangle once the story starts
+    timing.actualOnsets.TR(iTR) = Screen('Flip', mainWindow); % show the rectangle once the story starts
 
-
-    if SHOWINGFEEDBACK
-        if (GetSecs - timing.startFeedbackDisplay(lastStation)) >= 0.5 %(feedbackDur-slack)
-            Screen(mainWindow, 'FillRect', restCircleColor, rect)
-            timespec = timing.startFeedbackDisplay(lastStation) + feedbackDur - slack;
-            timing.stopFeedbackDisplay(lastStation) = Screen('Flip', mainWindow,timespec);
-            Screen('FillRect', mainWindow,restCircleColor, rect);
-            SHOWINGFEEDBACK = 0;
-        else % redraw so can flip on next TR anyway
-            Screen('DrawLine',mainWindow, 0,rect(1)-lineW,centerY,rect(3)+lineW,centerY,[7])
-            Screen(mainWindow, 'FillRect', restCircleColor, rect)
-            feedbackRect = rect;
-            feedbackRect(2) = rect(4) - (rect(4) - rect(2))*this_ev;
-            if this_ev <= 0.5
-                Screen(mainWindow,'FillRect', badColor, feedbackRect);
-                bonus_points = sprintf('$%2.2f', 0);
-            else
-                Screen(mainWindow,'FillRect', maxGreenCircleColor, feedbackRect);
-                bonus_points = sprintf('$%2.2f', this_ev);
-            end
-            runData.stationFeedbackGiven{lastStation} = bonus_points; % what people will see
-            tempBounds = Screen('TextBounds', mainWindow, bonus_points);
-            Screen('drawtext',mainWindow,bonus_points,centerX-tempBounds(3)/2,feedbackRect(4)+(centerY/10)-tempBounds(4)/2,[0 0 0]);
-        end
-    elseif isRecording > 0
-        Screen('FillRect', mainWindow,recordingCircleColor, rect)
-        
-    else % not showing feedback and not recording--most likely probe will be here
-        Screen('FillRect', mainWindow,restCircleColor, rect);
-
-        %fprintf('here\n')
-        if keep_display
-            Screen('drawtext',mainWindow,'INDEX',centerX - centerX/2 -tempBounds_IND(3)/2,centerY-rectHeight/2 - tempBounds_IND(4)/2,textColor);
-            Screen('drawtext',mainWindow,runData.LEFT_PRESS,centerX - centerX/2 -tempBounds_L(3)/2,centerY - tempBounds_L(4)/2,textColor);
-            Screen('drawtext',mainWindow,'MIDDLE',centerX+centerX/2+tempBounds_MID(3)/2,centerY-rectHeight/2 - tempBounds_MID(4)/2,textColor);
-            Screen('drawtext',mainWindow,runData.RIGHT_PRESS,centerX+centerX/2+tempBounds_R(3)/2,centerY - tempBounds_R(4)/2,textColor);
-        end
-        if ~probe_start(nextStation) && abs(GetSecs - timing.plannedOnsets.probeON(nextStation)) <= 1
-            %fprintf('HERE IN ON')
-            %KbQueueCreate(DEVICE,key_map);
-            %KbQueueStart(DEVICE);
-            probe_start(nextStation) = 1;
-            % put display on and look for keypress
-            % will likely need to keep putting this up
-            keep_display = 1;
-            tempBounds_IND = Screen('TextBounds', mainWindow, 'INDEX');
-            tempBounds_MID = Screen('TextBounds', mainWindow, 'MIDDLE');
-            tempBounds_L = Screen('TextBounds', mainWindow, runData.LEFT_PRESS);
-            tempBounds_R = Screen('TextBounds', mainWindow, runData.RIGHT_PRESS);
-            Screen('drawtext',mainWindow,'INDEX',centerX - centerX/2 -tempBounds_IND(3)/2,centerY-rectHeight/2 - tempBounds_IND(4)/2,textColor);
-            Screen('drawtext',mainWindow,runData.LEFT_PRESS,centerX - centerX/2 -tempBounds_L(3)/2,centerY - tempBounds_L(4)/2,textColor);
-            Screen('drawtext',mainWindow,'MIDDLE',centerX+centerX/2+tempBounds_MID(3)/2,centerY-rectHeight/2 - tempBounds_MID(4)/2,textColor);
-            Screen('drawtext',mainWindow,runData.RIGHT_PRESS,centerX+centerX/2+tempBounds_R(3)/2,centerY - tempBounds_R(4)/2,textColor);
-            %KbQueueFlush(DEVICE);
-            timespec = timing.plannedOnsets.probeON(nextStation) - slack;
-            timing.actualOnsets.probeON(nextStation) = Screen('Flip',mainWindow,timespec); % flip as soon as it's ready
-            Screen('FillRect', mainWindow,restCircleColor, rect);
-            Screen('drawtext',mainWindow,'INDEX',centerX - centerX/2 -tempBounds_IND(3)/2,centerY-rectHeight/2 - tempBounds_IND(4)/2,textColor);
-            Screen('drawtext',mainWindow,runData.LEFT_PRESS,centerX - centerX/2 -tempBounds_L(3)/2,centerY - tempBounds_L(4)/2,textColor);
-            Screen('drawtext',mainWindow,'MIDDLE',centerX+centerX/2+tempBounds_MID(3)/2,centerY-rectHeight/2 - tempBounds_MID(4)/2,textColor);
-            Screen('drawtext',mainWindow,runData.RIGHT_PRESS,centerX+centerX/2+tempBounds_R(3)/2,centerY - tempBounds_R(4)/2,textColor);
-        elseif ~probe_stop(nextStation) && (GetSecs - timing.actualOnsets.probeON(nextStation)) >= 0.5
-            % just go back to a regular display
-            %fprintf('here in OFF')
-            keep_display = 0;
-            timespec = timing.plannedOnsets.probeOFF(nextStation) - slack;
-            timing.actualOnsets.probeOFF(nextStation) = Screen('Flip',mainWindow,timespec);
-            probe_stop(nextStation) = 1;
-            Screen('FillRect', mainWindow,restCircleColor, rect);
-        end
-        
-    end
-    
-%     [keyIsDown, keyCode] = KbQueueCheck(DEVICE);
-%     if keyCode(LEFT) || keyCode(RIGHT)
-%         if keyCode(LEFT)
-%             runData.leftPressRT(iTR) = keyCode(LEFT);
-%         end
-%         if keyCode(RIGHT)
-%             runData.rightPressRT(iTR) = keyCode(RIGHT);
-%         end
-%     end
-    timespec = timing.plannedOnsets.story(iTR) - slack;
-    %a(iTR) = GetSecs;
-    [timing.trig.pulses(volCounter) runData.pulses(volCounter) runData.leftPressRT(iTR), runData.rightPressRT(iTR)] = WaitTRPulse_KbQueue(TRIGGER_keycode,DEVICE,timing.plannedOnsets.story(iTR));
-    %b(iTR) = GetSecs;
-    %b(iTR)-a(iTR)
-    timing.actualOnsets.story(iTR) = Screen('Flip',mainWindow,timespec);
+    % first flush any previous key presses
     KbQueueFlush(DEVICE);
-    %c(iTR) = GetSecs;
-    if runData.leftPressRT(iTR) > 0
-        runData.leftPress(iTR) = 1;
+    % enter any left or right key presses
+    if timing.leftPressRT(volCounter) > 0 && iTR > 1
+        runData.leftPressRT(iTR-1) = timing.leftPressRT(volCounter);
+        runData.leftPress(iTR-1) = 1; % the TR in which the press occurred
+        leftPress = 1;
     end
-    if runData.rightPressRT(iTR) > 0
-        runData.rightPress(iTR) = 1;
+    if timing.rightPressRT(volCounter) > 0 && iTR > 1
+        runData.rightPressRT(iTR-1) = timing.rightPressRT(volCounter);
+        runData.rightPress(iTR-1) = 1;
+        rightPress = 1;
     end
-    % check if there's any updated score available
-    if isLookingStation > 0 % skip this if you just started story
-        % if you haven't given feedback yet for that station and you're within
-        % 10 TRs (something went wrong/skip otherwise)
-        lastStation = isLookingStation;
-        if rtData
-            if isnan(runData.stationScore(lastStation))
-                % look for output
-                timing.classifierLoadStart(iTR,lastStation) = GetSecs;
-                tClassOutputFileTimeout = GetSecs + deltat;
-                while (~runData.classOutputFileLoad(iTR,lastStation) && (GetSecs < tClassOutputFileTimeout))
-                    [runData.classOutputFileLoad(iTR,lastStation) runData.classOutputFile{iTR,lastStation}] = GetSpecificClassOutputFile(classOutputDir,runData.run,lastStation-1,usepython); %#ok<AGROW>
-                end
-                % now if file exists load score
-                if runData.classOutputFileLoad(iTR,lastStation)
-                    timing.classifierStationFound(iTR,lastStation) = GetSecs;
-                    tempStruct = load([classOutputDir '/' runData.classOutputFile{iTR,lastStation}]);
-                    if ~usepython
-                        runData.stationScore(lastStation) = tempStruct.classOutput;
-                    else
-                        runData.stationScore(lastStation) = tempStruct;
-                    end
-                    this_ev = runData.stationScore(lastStation);
-                    Screen('DrawLine',mainWindow, 0,rect(1)-lineW,centerY,rect(3)+lineW,centerY,[7])
-                    Screen(mainWindow, 'FillRect', restCircleColor, rect)
-                    feedbackRect = rect;
-                    feedbackRect(2) = rect(4) - (rect(4) - rect(2))*this_ev;
-                    if this_ev <= 0.5
-                        Screen(mainWindow,'FillRect', badColor, feedbackRect);
-                        bonus_points = sprintf('$%2.2f', 0);
-                    else
-                        Screen(mainWindow,'FillRect', maxGreenCircleColor, feedbackRect);
-                        bonus_points = sprintf('$%2.2f', this_ev);
-                    end
-                    runData.stationFeedbackGiven{lastStation} = bonus_points; % what people will see
-                    tempBounds = Screen('TextBounds', mainWindow, bonus_points);
-                    Screen('drawtext',mainWindow,bonus_points,centerX-tempBounds(3)/2,feedbackRect(4)+(centerY/10)-tempBounds(4)/2,[0 0 0]);
-                    timing.startFeedbackDisplay(lastStation) = Screen('Flip',mainWindow); % flip as soon as it's ready
-                    SHOWINGFEEDBACK = 1; % ARE WE CURRENTLY DISPLAYING FEEDBACK
+
+    % now check for any new classification outputs
+    if blockType == cfg.HAPPY
+        if runData.rtData
+            timing.classifierLoadStart(iTR) = GetSecs;
+            tOutputFileTimeOut = GetSecs + deltat;
+            % look for the TR 2 TR's before the current TR***
+            trLook = volCounter - 2;
+            trId = sprintf('TR-%03d',trLook); % this is the filenum of the TR 
+            while (~runData.OutputFileLoad(iTR) && (GetSecs < tOutputFileTimeOut))
+               [runData.OutputFileLoad(iTR), runData.OutputFile{iTR}] = GetSpecificOutputFile(runDir_rtcloud, runId, trId);
+            end
+            % if file exists, load the score
+            if runData.OutputFileLoad(iTR)
+               timing.classifierFileFound(iTR) = GetSecs;
+               % this is where we load the text file
+               psc = load([runDir_rtcloud '/' runData.OutputFile{iTR}]);
+               runData.feedbackScore(iTR) = psc;
+               % smooth if you can
+               if ~isnan(runData.feedbackScoreSmoothed(iTR-2))
+                   % we can smooth over 3
+                   runData.feedbackScoreSmoothed(iTR) = mean([runData.feedbackScore(iTR-2:iTR)]);
+               elseif ~isnan(runData.feedbackScoreSmoothed(iTR-1))
+                   % we can smooth over 2
+                   runData.feedbackScoreSmoothed(iTR) = mean([runData.feedbackScore(iTR-1:iTR)]);
+               else
+                   % no smoothing
+                   runData.feedbackScoreSmoothed(iTR) = runData.feedbackScore(iTR);
+               end
+               % now update display
+               currentScore = runData.feedbackScoreSmoothed(iTR);
+               Screen('drawtext',mainWindow,'HAPPY',centerX - tempBounds_HAPPY(3)/2,centerY-rectHeight/2 - rectHeight/2,textColor);
+               Screen(mainWindow, 'FillRect', restColor, rect)
+               Screen('DrawLine',mainWindow, 0,rect(1)-lineW,centerY,rect(3)+lineW,centerY,[7])
+               % this makes a rectangle that's in proportion to the score
+               feedbackRect = rect;
+               feedbackRect(2) = rect(4) - (rect(4) - rect(2))*currentScore;
+                 if currentScore <= 0.5
+                    Screen(mainWindow,'FillRect', badColor, feedbackRect);
+                    bonus_points = sprintf('$%2.2f', 0);
                 else
-                    runData.classOutputFile{iTR,lastStation} = 'not ready';
+                    Screen(mainWindow,'FillRect', maxGreenColor, feedbackRect);
+                    bonus_points = sprintf('$%2.2f', currentScore);
                 end
-                
+                % put bonus score under the rectangle
+                runData.FeedbackGiven{iTR} = bonus_points; % what people will see
+                tempBounds = Screen('TextBounds', mainWindow, bonus_points);
+                Screen('drawtext',mainWindow,bonus_points,centerX - tempBounds(3)/2,feedbackRect(4)+(centerY/10)-tempBounds(4)/2,[0 0 0]);
+                timing.startFeedbackDisplay(iTR) = Screen('Flip',mainWindow); % flip as soon as it's ready
             end
         end
-    else
-        %  lastStation = 1; % initialize it here for print
     end
+
     % print out TR information
-    fprintf(dataFile,'%-8d%-8d%-8d%-8.3f%-8d%-8df%-8df%-8d%-8d%-8d%-8.3f\n', runNum,volCounter,iTR,timing.actualOnsets.story(iTR)-timing.plannedOnsets.story(iTR),runData.pulses(volCounter),runData.leftPress(iTR),runData.rightPress(iTR),isStation,isLookingStation,runData.classOutputFileLoad(iTR,lastStation),runData.stationScore(lastStation));
-    fprintf('%-8d%-8d%-8d%-8.3f%-8d%-8d%-8df%-8d%-8d%-8d%-8.3f\n', runNum,volCounter,iTR,timing.actualOnsets.story(iTR)-timing.plannedOnsets.story(iTR),runData.pulses(volCounter),runData.leftPress(iTR),runData.rightPress(iTR),isStation,isLookingStation,runData.classOutputFileLoad(iTR,lastStation),runData.stationScore(lastStation));
+    fprintf(dataFile,'%-8d%-8s%-8d%-8d%-8.3f%-8d%-8.3f%-8.3f%-8d%-8.3f\n', runNum,blockTypeStr,volCounter,iTR,timing.actualOnsets.TR(iTR)-timing.plannedOnsets.TR(iTR),runData.pulses(volCounter),leftPress,rightPress,runData.OutputFileLoad(iTR),runData.feedbackScoreSmoothed(iTR));
+    fprintf('%-8d%-8s%-8d%-8d%-8.3f%-8d%-8.3f%-8.3f%-8d%-8.3f\n', runNum,blockTypeStr,volCounter,iTR,timing.actualOnsets.TR(iTR)-timing.plannedOnsets.TR(iTR),runData.pulses(volCounter),leftPress,rightPress,runData.OutputFileLoad(iTR),runData.feedbackScoreSmoothed(iTR));
 end
 
 Screen(mainWindow,'TextSize',textSize);
@@ -547,8 +510,8 @@ Screen('drawtext',mainWindow,rewardMessage,centerX-tempBounds(3)/2,centerY-tempB
 Screen('Flip', mainWindow);
 WaitSecs(5);
 %% save everything
-file_name = ['behavior_run' num2str(runData.run) '_' datestr(now,30) '.mat'];
-save(fullfile(runHeader,file_name),'timing', 'runData');
+file_name = ['behavior_' runId '_' datestr(now,30) '.mat'];
+save(fullfile(runDir_display,file_name),'timing', 'runData');
 
 %% ADD MESSAGE THAT SAYS THEIR TOTAL SCORE HERE!!
 
