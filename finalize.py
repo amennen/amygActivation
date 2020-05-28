@@ -72,7 +72,7 @@ def main(argv=None):
 	# load the experiment configuration file
 	cfg = utils.loadConfigFile(args.config)
 	cfg = initialize(cfg, args)
-
+	print(args.config)
 	nRunsCompleted = finalize(cfg,args)
 	# copy subject folders from server to local
 	# subject-specific folder
@@ -91,8 +91,11 @@ def main(argv=None):
 
 		# we don't need the tmp/convertedNiftis so first remove those
 		tempNiftiDir = os.path.join(cfg.server.dataDir, 'tmp/convertedNiftis/')
-		projUtils.deleteFolder(tempNiftiDir)
-
+		if os.path.exists(tempNiftiDir):
+			projUtils.deleteFolder(tempNiftiDir)
+			print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+			print('deleting temporary convertedNifti folder: ', tempNiftiDir)
+			print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
 		# next, go through each run and put each run data into local run folder
 		for r in np.arange(nRunsCompleted):
 			runNum = r + 1 # run numbers start at 1
@@ -101,16 +104,19 @@ def main(argv=None):
 			listOfFiles = glob.glob(runFolder)
 			runFolder_local = cfg.local.subject_full_day_path + '/' + runId 
 			projUtils.downloadFilesFromList(fileInterface, listOfFiles, runFolder_local)
-
+			print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+			print('downloading data to local computer: ', runFolder)
 		# next delete the entire subject folder on the cloud
 		# MAKE SURE THIS IS CORRECT FOR YOUR EXPERIMENT BEFORE YOU RUN
 		subject_dir = '{0}/{1}'.format(cfg.server.dataDir, cfg.bids_id)
 		print('FOLDER TO DELETE ON CLOUD SERVER: ', subject_dir)
+		print('IF THIS IS CORRECT, GO BACK TO THE CONFIG FILE\nCHANGE THE FLAG FROM false TO true IN server.deleteAfter')
 		if cfg.server.deleteAfter:
 			print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
 			print('DELETING SUBJECT FOLDER ON CLOUD SERVER: ', subject_dir)
 			print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-			projUtils.deleteFolder(subject_dir)
+			if os.path.exists(subject_dir):
+				projUtils.deleteFolder(subject_dir)
 
 	return 0
 
