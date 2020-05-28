@@ -72,35 +72,35 @@ def initialize(cfg, args):
     cfg.ses_id = 'ses-{0:02d}'.format(cfg.subjectDay)
     
     # specify local directories
-    cfg.local.codeDir = cfg.local.rtcloudDir + '/projects' + '/' + cfg.projectName
-    cfg.local.dataDir = cfg.local.codeDir + '/' + 'data' 
-    cfg.local.subject_full_day_path = '{0}/{1}/{2}'.format(cfg.local.dataDir, cfg.bids_id, cfg.ses_id)
-    cfg.local.subject_reg_dir = '{0}/registration_outputs/'.format(cfg.local.subject_full_day_path)
-    cfg.local.wf_dir = '{0}/{1}/ses-{2:02d}/registration/'.format(cfg.local.dataDir, cfg.bids_id, 1)
-    cfg.local.maskDir = cfg.local.codeDir + '/' + 'ROI'
+    cfg.local.codeDir = os.path.join(cfg.local.rtcloudDir, 'projects', cfg.projectName)
+    cfg.local.dataDir = os.path.join(cfg.local.codeDir, 'data') 
+    cfg.local.subject_full_day_path = os.path.join(cfg.local.dataDir, cfg.bids_id, cfg.ses_id)
+    cfg.local.subject_reg_dir = os.path.join(cfg.local.subject_full_day_path, 'registration_outputs')
+    cfg.local.wf_dir = os.path.join(cfg.local.dataDir, cfg.bids_id, 'ses-01', 'registration')
+    cfg.local.maskDir = os.path.join(cfg.local.codeDir, 'ROI')
     cfg.subject_reg_dir = cfg.local.subject_reg_dir
     cfg.wf_dir = cfg.local.wf_dir
     cfg.n_masks = len(cfg.MASK)
 
     if args.filesremote: # here we will need to specify separate paths for processing
-        cfg.server.codeDir = cfg.server.rtcloudDir + '/projects' + '/' + cfg.projectName + '/'
-        cfg.server.dataDir = cfg.server.codeDir + '/' + cfg.server.serverDataDir
-        cfg.server.subject_full_day_path = '{0}/{1}/{2}'.format(cfg.server.dataDir, cfg.bids_id, cfg.ses_id)
-        cfg.server.subject_reg_dir = '{0}/registration_outputs/'.format(cfg.server.subject_full_day_path)
-        cfg.server.wf_dir = '{0}/{1}/ses-{2:02d}/registration/'.format(cfg.server.dataDir, cfg.bids_id, 1)
-        cfg.server.maskDir = cfg.server.codeDir + '/' + 'ROI'
+        cfg.server.codeDir = os.path.join(cfg.server.rtcloudDir, 'projects', cfg.projectName)
+        cfg.server.dataDir = os.path.join(cfg.server.codeDir, cfg.server.serverDataDir)
+        cfg.server.subject_full_day_path = os.path.join(cfg.server.dataDir, cfg.bids_id, cfg.ses_id)
+        cfg.server.subject_reg_dir = os.path.join(cfg.server.subject_full_day_path, 'registration_outputs')
+        cfg.server.wf_dir = os.path.join(cfg.server.dataDir, cfg.bids_id, 'ses-01', 'registration')
+        cfg.server.maskDir = os.path.join(cfg.server.codeDir, 'ROI')
         cfg.subject_reg_dir = cfg.server.subject_reg_dir
         cfg.wf_dir = cfg.server.wf_dir
-    cfg.ref_BOLD = cfg.wf_dir + '/' + 'ref_image.nii.gz'
-    #cfg.ref_BOLD = cfg.subject_reg_dir + '/' + 'ref_BOLD2.nii.gz'
-    cfg.MNI_ref_filename = cfg.wf_dir + '/' + cfg.MNI_ref_BOLD 
-    cfg.T1_to_BOLD = cfg.wf_dir + '/' + 'affine.txt'
-    cfg.MNI_to_T1 = cfg.wf_dir + '/' + 'ants_t1_to_mniInverseComposite.h5'
+    cfg.ref_BOLD = os.path.join(cfg.wf_dir,'ref_image.nii.gz')
+    cfg.MNI_ref_filename = os.path.join(cfg.wf_dir, cfg.MNI_ref_BOLD) 
+    cfg.T1_to_BOLD = os.path.join(cfg.wf_dir, 'affine.txt')
+    cfg.MNI_to_T1 = os.path.join(cfg.wf_dir, 'ants_t1_to_mniInverseComposite.h5')
     cfg.MASK_transformed = [''] * cfg.n_masks
     cfg.local_MASK_transformed = [''] * cfg.n_masks
     for m in np.arange(cfg.n_masks):
-        cfg.MASK_transformed[m] = cfg.subject_reg_dir + '/' + cfg.MASK[m].split('.')[0] + '_space-native.nii.gz'
-        cfg.local_MASK_transformed[m] = cfg.local.subject_reg_dir + '/' + cfg.MASK[m].split('.')[0] + '_space-native.nii.gz'
+        mask_name = cfg.MASK[m].split('.')[0] + '_space-native.nii.gz'
+        cfg.MASK_transformed[m] = os.path.join(cfg.subject_reg_dir, mask_name)
+        cfg.local_MASK_transformed[m] = os.path.join(cfg.local.subject_reg_dir, mask_name)
     # get conversion to flip dicom to nifti files
     cfg.axesTransform = getTransform(('L', 'A', 'S'),('P', 'L', 'S'))
     return cfg

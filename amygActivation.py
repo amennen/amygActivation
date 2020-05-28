@@ -78,7 +78,7 @@ def makeRunReg(cfg, args, fileInterface, runNum, runFolder, saveMat=1):
             # save this back to local machine
             # make it into a list to use in the function
             fileList = [full_name]
-            local_run_folder = cfg.local.subject_full_day_path + '/' + runId 
+            local_run_folder = os.path.join(cfg.local.subject_full_day_path, runId)
             projUtils.downloadFilesFromList(fileInterface,fileList,local_run_folder)
     # TO DO: put command here to download data to local!
     return regressor
@@ -137,11 +137,12 @@ def registerMNIToNewNifti(cfg, args, full_nifti_name):
     for m in np.arange(cfg.n_masks):
         # rerun for each mask
         if args.filesremote:
-            full_ROI_path = cfg.server.maskDir + '/' + cfg.MASK[m]
+            full_ROI_path = os.path.join(cfg.server.maskDir, cfg.MASK[m])
         else:
-            full_ROI_path = cfg.local.maskDir + '/' + cfg.MASK[m]
+            full_ROI_path = os.path.join(cfg.local.maskDir, cfg.MASK[m])
         base_ROI_name = cfg.MASK[m].split('.')[0]
-        output_nifti_name = '{0}/{1}_space-native.nii.gz'.format(cfg.subject_reg_dir, base_ROI_name)
+        base_ROI_name_native = '{0}_space-native.nii.gz'.format(base_ROI_name)
+        output_nifti_name = os.path.join(cfg.subject_reg_dir, base_ROI_name_native)
 
         command = 'antsApplyTransforms --default-value 0 --float 1 --interpolation NearestNeighbor -d 3 -e 3 --input {0} --reference-image {1} --output {2}/{3}_space-native.nii.gz  --transform {7} --transform {6} --transform {4}/ref_2_{5}.txt -v 1'.format(full_ROI_path, full_nifti_name, cfg.subject_reg_dir, base_ROI_name, cfg.subject_reg_dir, base_nifti_name, cfg.T1_to_BOLD, cfg.MNI_to_T1)
         #print('(3) ' + command)
@@ -156,11 +157,12 @@ def registerNewNiftiToMNI(cfg, full_nifti_name):
     # should operate over each TR
     # needs full path of nifti file to register
     base_nifti_name = full_nifti_name.split('/')[-1].split('.')[0]
-    output_nifti_name = '{0}{1}_space-MNI.nii.gz'.format(cfg.subject_reg_dir, base_nifti_name)
+    base_nifti_name_MNI = '{0}_space-MNI.nii.gz'.format(base_nifti_name)
+    output_nifti_name = os.path.join(cfg.subject_reg_dir, base_nifti_name_MNI)
 
     if not os.path.isfile(output_nifti_name): # only run this code if the file doesn't exist already
         # (1) run mcflirt with motion correction to align to bold reference
-        command = 'mcflirt -in {0} -reffile {1} -out {2}{3}_MC -mats'.format(full_nifti_name, cfg.ref_BOLD, cfg.subject_reg_dir, base_nifti_name)
+        command = 'mcflirt -in {0} -reffile {1} -out {2}/{3}_MC -mats'.format(full_nifti_name, cfg.ref_BOLD, cfg.subject_reg_dir, base_nifti_name)
         #print('(1) ' + command)
         A = time.time()
         call(command, shell=True)
@@ -168,7 +170,7 @@ def registerNewNiftiToMNI(cfg, full_nifti_name):
         print(B-A)
 
         # (2) run c3daffine tool to convert .mat to .txt
-        command = 'c3d_affine_tool -ref {0} -src {1} {2}{3}_MC.mat/MAT_0000 -fsl2ras -oitk {4}{5}_2ref.txt'.format(cfg.ref_BOLD, full_nifti_name, cfg.subject_reg_dir, base_nifti_name, cfg.subject_reg_dir, base_nifti_name)
+        command = 'c3d_affine_tool -ref {0} -src {1} {2}/{3}_MC.mat/MAT_0000 -fsl2ras -oitk {4}/{5}_2ref.txt'.format(cfg.ref_BOLD, full_nifti_name, cfg.subject_reg_dir, base_nifti_name, cfg.subject_reg_dir, base_nifti_name)
         #print('(2) ' + command)
         A = time.time()
         call(command, shell=True)
@@ -176,7 +178,7 @@ def registerNewNiftiToMNI(cfg, full_nifti_name):
         print(B-A)
 
         # (3) combine everything with ANTs call
-        command = 'antsApplyTransforms --default-value 0 --float 1 --interpolation LanczosWindowedSinc -d 3 -e 3 --input {0} --reference-image {1} --output {2}{3}_space-MNI.nii.gz --transform {4}{5}_2ref.txt --transform {6} --transform {7} -v 1'.format(full_nifti_name, cfg.MNI_ref_filename, cfg.subject_reg_dir, base_nifti_name, cfg.subject_reg_dir, base_nifti_name, cfg.BOLD_to_T1, cfg.T1_to_MNI)
+        command = 'antsApplyTransforms --default-value 0 --float 1 --interpolation LanczosWindowedSinc -d 3 -e 3 --input {0} --reference-image {1} --output {2}/{3}_space-MNI.nii.gz --transform {4}/{5}_2ref.txt --transform {6} --transform {7} -v 1'.format(full_nifti_name, cfg.MNI_ref_filename, cfg.subject_reg_dir, base_nifti_name, cfg.subject_reg_dir, base_nifti_name, cfg.BOLD_to_T1, cfg.T1_to_MNI)
         #print('(3) ' + command)
         A = time.time()
         call(command, shell=True)
@@ -256,9 +258,9 @@ def makeTRHeader(cfg, runIndex, TRFilenum, TRindex, percent_change):
 def createRunFolder(cfg, args, runNum):
     runId = 'run-{0:02d}'.format(runNum)
     if args.filesremote:
-        runFolder = cfg.server.subject_full_day_path + '/' + runId
+        runFolder = os.path.join(cfg.server.subject_full_day_path, runId)
     else:
-        runFolder = cfg.local.subject_full_day_path + '/' + runId
+        runFolder = os.path.join(cfg.local.subject_full_day_path, runId)
     if not os.path.exists(runFolder):
         os.makedirs(runFolder)
     return runFolder
@@ -317,10 +319,10 @@ def split_tol(test_list, tol):
 
 # testing code--debug mode -- run in amygActivation directory
 # from amygActivation import *
-# defaultConfig = 'conf/amygActivation.toml'
+# defaultConfig = 'conf/sampleCfg.toml'
 # args = StructDict({'config':defaultConfig, 'runs': '1', 'scans': '9', 'commpipe': None, 'filesremote': True})
 # runIndex=0
-# TRFilenum=11
+# TRFilenum=9
 
 def main():
     logger = logging.getLogger()
@@ -424,7 +426,7 @@ def main():
                 text_to_save = '{0:05f}'.format(runData.percent_change[TRindex])
                 file_name_to_save = getOutputFilename(run, TRFilenum) # save as the actual file number, not index
                 # now we want to always send this back to the local computer running the display
-                full_file_name_to_save =  cfg.local.subject_full_day_path + '/' + runId + '/' + file_name_to_save
+                full_file_name_to_save =  os.path.join(cfg.local.subject_full_day_path, runId, file_name_to_save)
                 # Send classification result back to the console computer
                 fileInterface.putTextFile(full_file_name_to_save, text_to_save)
                 if args.commpipe:    
@@ -433,7 +435,6 @@ def main():
             TRheader = makeTRHeader(cfg, runIndex, TRFilenum, TRindex, runData.percent_change[TRindex])
             TRindex += 1
 
-        # TO DO - save the run regressor at each spot too maybe in the run folder, and maybe save specifically on the local display too
 
         # SAVE OVER RUN 
         runData.scanNum = scanNum # save scanning number
@@ -441,21 +442,10 @@ def main():
         runData.dicomDir = cfg.dicomDir
         run_filename = getRunFilename(cfg.sessionId, run)
         full_run_filename_to_save = os.path.join(runFolder, run_filename)
-        #try:
         sio.savemat(full_run_filename_to_save, runData, appendmat=False)
-        #except Exception as err:
-        #    errorReply = self.createReplyMessage(msg, MsgResult.Errsor)
-        #    errorReply.data = "Error: Unable to save blkGrpFile %s: %r" % (blkGrpFilename, err)
-        #    return errorReply
+    
     sys.exit(0)
 
 if __name__ == "__main__":
     # execute only if run as a script
     main()
-
-# to do: clean up scripts to get registration in ses 1 and move to day 2
-# make finalize scripts to delete things from the cloud server and return everything to local
-# add brainiak connectivity between two regions
-# make display
-# make change to dicomnifti handler
-

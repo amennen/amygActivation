@@ -37,9 +37,9 @@ defaultConfig = os.path.join(currPath, 'conf/amygActivation.toml')
 
 def finalize(cfg, args):
 	# first find the number of runs completed
-	run_path = cfg.local.subject_full_day_path + '/' + 'run*'
+	run_path = os.path.join(cfg.local.subject_full_day_path, 'run*')
 	if args.filesremote:
-		run_path = cfg.server.subject_full_day_path + '/' + 'run*'
+		run_path = os.path.join(cfg.server.subject_full_day_path, 'run*')
 	nRuns_completed = len(glob.glob(run_path))
 	return nRuns_completed
 
@@ -100,17 +100,17 @@ def main(argv=None):
 		for r in np.arange(nRunsCompleted):
 			runNum = r + 1 # run numbers start at 1
 			runId = 'run-{0:02d}'.format(runNum)
-			runFolder = cfg.server.subject_full_day_path + '/' + runId + '/*'
+			runFolder = os.path.join(cfg.server.subject_full_day_path, runId, '*')
 			listOfFiles = glob.glob(runFolder)
-			runFolder_local = cfg.local.subject_full_day_path + '/' + runId 
+			runFolder_local = os.path.join(cfg.local.subject_full_day_path, runId)
 			projUtils.downloadFilesFromList(fileInterface, listOfFiles, runFolder_local)
 			print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
 			print('downloading data to local computer: ', runFolder)
 		# next delete the entire subject folder on the cloud
 		# MAKE SURE THIS IS CORRECT FOR YOUR EXPERIMENT BEFORE YOU RUN
-		subject_dir = '{0}/{1}'.format(cfg.server.dataDir, cfg.bids_id)
+		subject_dir = os.path.join(cfg.server.dataDir, cfg.bids_id)
 		print('FOLDER TO DELETE ON CLOUD SERVER: ', subject_dir)
-		print('IF THIS IS CORRECT, GO BACK TO THE CONFIG FILE\nCHANGE THE FLAG FROM false TO true IN server.deleteAfter')
+		print('IF THIS IS CORRECT, GO BACK TO THE CONFIG FILE USED ON THE WEB SERBER COMPUTER AND CHANGE THE FLAG FROM false --> true IN [server] deleteAfter')
 		if cfg.server.deleteAfter:
 			print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
 			print('DELETING SUBJECT FOLDER ON CLOUD SERVER: ', subject_dir)
