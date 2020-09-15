@@ -1,12 +1,10 @@
-# faceMatching
 # amygActivation
 
-# Young 2014 run struture:
-# blocks of rest, happy, count each 40 seconds
-# continuous feedback during the whole happy block
-# no feedback condition - same happy task but no feedback 
-# we're going to have even/odd judgements instead of counting down so it's not stressful
-# 13 blocks of 40 seconds each = 520 seconds (347 TRs) - put 10 TRs from first trigger and then 5 at the end
-# 362 TRs total
-
-# let's make them 42 seconds each for the TRs to be right --> 379 TRs total
+- this task was based on the task structure described in Young et al. (2014)
+- we're using blocks of rest, happy, math each 42 seconds long
+- happy blocks: continuous feedback to upregulate amygdala activity
+- math blocks: even/odd judgment
+- rest blocks: fixation
+- no feedback condition - same happy task but no feedback 
+- there are 13 blocks of 42 seconds each
+- 10 TRs are added after the first trigger and then 5 TRs are added at the end --> 379 TRs total
