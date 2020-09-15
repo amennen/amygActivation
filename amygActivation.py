@@ -100,8 +100,8 @@ def convertToNifti(cfg, args, TRnum, scanNum, dicomData):
     nameToSaveNifti = expected_dicom_name.split('.')[0] + '.nii.gz'
     fullNiftiFilename = os.path.join(tempNiftiDir, nameToSaveNifti)
     if not os.path.isfile(fullNiftiFilename): # only convert if haven't done so yet (check if doesn't exist)
-        base_ROI_name = cfg.MASK[0].split('.')[0]
-        reference = '{0}/{1}_space-native.nii.gz'.format(cfg.subject_reg_dir, base_ROI_name)
+        base_ROI_name = cfg.MASK[cfg.useMask].split('.')[0]
+        reference = '{0}/{1}_space-native.nii.gz'.format(cfg.maskDir, base_ROI_name)
         fullNiftiFilename = dnh.saveAsNiftiImage(dicomData, fullNiftiFilename, cfg, reference)
     else:
         print('SKIPPING CONVERSION FOR EXISTING NIFTI {}'.format(fullNiftiFilename))
