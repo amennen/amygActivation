@@ -409,8 +409,10 @@ def main():
             A = time.time()
             dicomData = readRetryDicomFromFileInterface(fileInterface, getDicomFileName(cfg, scanNum, TRFilenum), timeout=timeout_file)
             full_nifti_name = convertToNifti(cfg, args, TRFilenum, scanNum, dicomData)
+            print('**NEW NIFTI FILE THAT IS BEING READ**')
             print(full_nifti_name)
-            print(cfg.MASK_transformed[cfg.useMask])
+            PRINT('**COMMENT OUT (amygActivation.py - line 414) TO REMOVE THIS OUTPUT')
+            # print(cfg.MASK_transformed[cfg.useMask])
             maskedData = apply_mask(full_nifti_name, cfg.MASK_transformed[cfg.useMask])
             runData.all_data[:, TRindex] = maskedData
             B = time.time()
